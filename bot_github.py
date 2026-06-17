@@ -134,11 +134,32 @@ def get_zustand(data):
         return f"❔ {v}"
     return "❓ Unbekannt"
 
-def start_browser():
+# REPARATUR: Holt eine Liste funktionierender Proxys
+def fetch_proxies():
+    try:
+        res = req_lib.get("https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all", timeout=10)
+        if res.status_code == 200:
+            proxies = [p.strip() for p in res.text.split("\n") if p.strip()]
+            return proxies
+    except:
+        pass
+    return []
+
+def start_browser(proxy=None):
     options = webdriver.FirefoxOptions()
     options.add_argument("--headless")
-    # REPARATUR: Dem Server-Browser einen echten Namen geben, damit er nicht blockiert wird
     options.set_preference("general.useragent.override", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0")
+    
+    # REPARATUR: Proxy-Einstellungen in den Firefox-Browser einspeisen
+    if proxy:
+        ip, port = proxy.split(":")
+        options.set_preference("network.proxy.type", 1)
+        options.set_preference("network.proxy.http", ip)
+        options.set_preference("network.proxy.http_port", int(port))
+        options.set_preference("network.proxy.ssl", ip)
+        options.set_preference("network.proxy.ssl_port", int(port))
+        print(f"  Nutze Proxy: {proxy}")
+
     service = Service(GECKODRIVER)
     driver = webdriver.Firefox(service=service, options=options)
     driver.set_window_size(1920, 1080)
@@ -196,7 +217,7 @@ def fetch_items(driver, brand):
         return items
     except Exception as e:
         if "Expecting value" not in str(e):
-            print(f"  Fehler ({brand}): {e}")
+            raise e
         return []
 
 def enrich_item(driver, item):
@@ -262,21 +283,44 @@ def main():
     start_time = time.time()
     seen_ids = load_seen_ids()
     first_run = len(seen_ids) == 0
-    driver = start_browser()
-    setup(driver)
-    print("Bot läuft jetzt durchgehend (bis Zeitlimit, dann übernimmt sofort der nächste Lauf)...")
+    
+    print("Lade Proxy-Liste...")
+    proxies = fetch_proxies()
+    proxy_index = 0
+    current_proxy = proxies[proxy_index] if proxies else None
+
+    driver = start_browser(current_proxy)
+    try:
+        setup(driver)
+    except:
+        print("Erster Proxy fehlgeschlagen, wechsle...")
+
+    print("Bot läuft jetzt durchgehend mit Proxy-Schutz...")
     try:
         while (time.time() - start_time) < CONFIG["max_job_minutes"] * 60:
             for brand in CONFIG["brands"]:
-                items = fetch_items(driver, brand)
-                print(f"[{brand}] {len(items)} gefunden")
-                for item in items:
-                    if item["id"] not in seen_ids:
-                        seen_ids.add(item["id"])
-                        if not first_run:
-                            item = enrich_item(driver, item)
-                            send_discord(item)
-                            print(f"NEU: {item['title']} | {item['total_min']}-{item['total_max']}€")
+                try:
+                    items = fetch_items(driver, brand)
+                    print(f"[{brand}] {len(items)} gefunden")
+                    for item in items:
+                        if item["id"] not in seen_ids:
+                            seen_ids.add(item["id"])
+                            if not first_run:
+                                item = enrich_item(driver, item)
+                                send_discord(item)
+                                print(f"NEU: {item['title']} | {item['total_min']}-{item['total_max']}€")
+                except Exception as e:
+                    # Wenn ein Timeout passiert, wechseln wir sofort den Proxy und starten den Browser neu
+                    print(f"  Proxy blockiert oder Verbindung verloren. Wechsle Proxy...")
+                    driver.quit()
+                    if proxies:
+                        proxy_index = (proxy_index + 1) % len(proxies)
+                        current_proxy = proxies[proxy_index]
+                    driver = start_browser(current_proxy)
+                    try:
+                        setup(driver)
+                    except:
+                        pass
                 time.sleep(1)
             if first_run:
                 print(f"Erstinitialisierung: {len(seen_ids)} Artikel markiert.")
@@ -286,7 +330,7 @@ def main():
     finally:
         driver.quit()
     save_seen_ids(seen_ids)
-    print("Lauf beendet (Zeitlimit) - naechster Lauf in der Warteschlange uebernimmt automatisch.")
+    print("Lauf beendet.")
 
 if __name__ == "__main__":
     main()
