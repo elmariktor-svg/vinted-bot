@@ -137,6 +137,8 @@ def get_zustand(data):
 def start_browser():
     options = webdriver.FirefoxOptions()
     options.add_argument("--headless")
+    # REPARATUR: Dem Server-Browser einen echten Namen geben, damit er nicht blockiert wird
+    options.set_preference("general.useragent.override", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0")
     service = Service(GECKODRIVER)
     driver = webdriver.Firefox(service=service, options=options)
     driver.set_window_size(1920, 1080)
@@ -144,12 +146,12 @@ def start_browser():
 
 def setup(driver):
     driver.get(f"https://{CONFIG['domain']}")
-    time.sleep(4)
+    time.sleep(5)
     try:
         WebDriverWait(driver, 8).until(
             EC.element_to_be_clickable((By.ID, "onetrust-accept-btn-handler"))
         ).click()
-        time.sleep(2)
+        time.sleep(3)
     except:
         pass
 
