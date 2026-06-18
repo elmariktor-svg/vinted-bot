@@ -4,7 +4,8 @@ from flask import Flask
 import requests as req_lib
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -29,18 +30,16 @@ CONFIG = {
         "vans", "converse", "hausschuhe", "flip flop", "sandale",
         "mütze", "cap", "beanie", "hut", "kappe", "snapback",
         "gürtel", "tasche", "bag", "rucksack", "parfum", "uhr",
-        "schmuck", "brille", "handschuhe", "schal", "armband",
-        "kette", "ring",
-        "unterwäsche", "unterhose", "unterhosen", "unterhemd",
-        "unterhemden", "boxer", "boxershorts", "slip", "bh",
-        "strumpf", "tanga", "tangas", "string", "socken",
-        "kleid", "kleider", "rock", "bluse", "leggings",
+        "schmuck", "brille", "handschuhe", "schal", "armband", "kette", "ring",
+        "unterwäsche", "unterhose", "unterhosen", "unterhemd", "unterhemden",
+        "boxer", "boxershorts", "slip", "bh", "strumpf", "tanga", "tangas", "string",
+        "socken", "kleid", "kleider", "rock", "bluse", "leggings",
         "bikini", "badeanzug", "bademode",
-        "baby", "kinder", "mädchen", "kids", "kinderbekleidung",
+        "baby", "kinder", "mädchen", "kids",
         "pyjama", "schlafanzug", "kostüm", "krawatte",
         "hose", "hosen", "jogginghose", "trainingshose", "jogger",
-        "chino", "chinos", "jeans hose", "stoffhose",
-        "t-shirt", "tshirt", "shirt", "longsleeve", "sweatshirt",
+        "chino", "chinos", "stoffhose",
+        "t-shirt", "tshirt", "longsleeve", "sweatshirt",
         "hoodie", "pullover", "jacke", "mantel",
     ],
     "defect_negations": [
@@ -53,22 +52,16 @@ CONFIG = {
         "keine risse", "kein riss",
     ],
     "defect_keywords": [
-        "fleck", "flecken", "blutfleck", "ölfleck", "weinfleck",
+        "fleck", "flecken", "blutfleck", "ölfleck",
         "riss", "risse", "einriss",
         "loch", "löcher",
-        "beschädigt", "beschädigung",
-        "defekt", "kaputt",
-        "kratzer",
-        "abgenutzt", "abnutzung", "ausgeblichen", "verblasst",
+        "beschädigt", "beschädigung", "defekt", "kaputt",
+        "kratzer", "abgenutzt", "ausgeblichen", "verblasst",
         "makel", "gebrauchsspuren",
-        "stain", "hole", "damaged", "worn",
-        "pilling", "pillen",
-        "verfärbt", "verfärbung", "farbabweichung",
-        "schaden",
-        "mangel", "mängel",
-        "dreckig", "schmutzig",
-        "gerissen", "abgerissen",
-        "verwaschen", "ausgewaschen",
+        "stain", "hole", "damaged", "worn", "pilling",
+        "verfärbt", "verfärbung", "schaden",
+        "mangel", "mängel", "dreckig", "schmutzig",
+        "gerissen", "abgerissen", "verwaschen", "ausgewaschen",
         "knopf fehlt", "knopf ab",
     ],
     "shipping_min": 3.0,
@@ -78,7 +71,6 @@ CONFIG = {
 }
 
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "")
-GECKODRIVER = "/usr/local/bin/geckodriver"
 
 seen_ids = set()
 total_found = 0
@@ -104,7 +96,7 @@ def load_seen_ids():
         except:
             seen_ids = set()
     else:
-        log("Starte frisch (keine seen_ids).")
+        log("Starte frisch.")
 
 def save_seen_ids():
     try:
@@ -154,32 +146,19 @@ def check_defects(title, desc):
     return any(w in text for w in CONFIG["defect_keywords"])
 
 CONDITION_MAP = {
-    "neu mit etikett": "🟢 Neu mit Etikett",
-    "neu, mit etikett": "🟢 Neu mit Etikett",
-    "new with tags": "🟢 Neu mit Etikett",
-    "brand new": "🟢 Neu mit Etikett",
-    "neu ohne etikett": "🟡 Neu ohne Etikett",
-    "neu, ohne etikett": "🟡 Neu ohne Etikett",
+    "neu mit etikett": "🟢 Neu mit Etikett", "neu, mit etikett": "🟢 Neu mit Etikett",
+    "new with tags": "🟢 Neu mit Etikett", "brand new": "🟢 Neu mit Etikett",
+    "neu ohne etikett": "🟡 Neu ohne Etikett", "neu, ohne etikett": "🟡 Neu ohne Etikett",
     "new without tags": "🟡 Neu ohne Etikett",
-    "wie neu": "🔵 Wie neu",
-    "like new": "🔵 Wie neu",
-    "sehr gut": "🔵 Sehr gut",
-    "sehr guter zustand": "🔵 Sehr gut",
-    "very good": "🔵 Sehr gut",
-    "gut": "🟠 Gut",
-    "guter zustand": "🟠 Gut",
-    "good": "🟠 Gut",
-    "zufriedenstellend": "🔴 Zufriedenstellend",
-    "satisfactory": "🔴 Zufriedenstellend",
-    "akzeptabel": "🔴 Akzeptabel",
-    "fair": "🔴 Akzeptabel",
+    "wie neu": "🔵 Wie neu", "like new": "🔵 Wie neu",
+    "sehr gut": "🔵 Sehr gut", "sehr guter zustand": "🔵 Sehr gut", "very good": "🔵 Sehr gut",
+    "gut": "🟠 Gut", "guter zustand": "🟠 Gut", "good": "🟠 Gut",
+    "zufriedenstellend": "🔴 Zufriedenstellend", "satisfactory": "🔴 Zufriedenstellend",
+    "akzeptabel": "🔴 Akzeptabel", "fair": "🔴 Akzeptabel",
 }
 CONDITION_ID_MAP = {
-    6: "🟢 Neu mit Etikett",
-    1: "🟡 Neu ohne Etikett",
-    2: "🔵 Sehr gut",
-    3: "🟠 Gut",
-    4: "🔴 Zufriedenstellend",
+    6: "🟢 Neu mit Etikett", 1: "🟡 Neu ohne Etikett",
+    2: "🔵 Sehr gut", 3: "🟠 Gut", 4: "🔴 Zufriedenstellend",
 }
 
 def get_zustand(data):
@@ -204,13 +183,17 @@ def get_zustand(data):
     return "❓ Unbekannt"
 
 def start_browser():
-    log("Starte Firefox...")
-    options = webdriver.FirefoxOptions()
+    log("Starte Chromium...")
+    options = Options()
     options.add_argument("--headless")
-    service = Service(GECKODRIVER)
-    driver = webdriver.Firefox(service=service, options=options)
-    driver.set_window_size(1920, 1080)
-    log("Firefox gestartet!")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.binary_location = "/usr/bin/chromium"
+    service = Service("/usr/bin/chromedriver")
+    driver = webdriver.Chrome(service=service, options=options)
+    log("Chromium gestartet!")
     return driver
 
 def setup(driver):
@@ -224,7 +207,7 @@ def setup(driver):
         time.sleep(2)
         log("Cookies akzeptiert!")
     except:
-        log("Cookies bereits akzeptiert oder nicht gefunden.")
+        log("Cookies OK.")
 
 def fetch_items(driver, search_query):
     js = f"""
@@ -256,22 +239,13 @@ def fetch_items(driver, search_query):
             total_min = round(price + service_fee + CONFIG["shipping_min"], 2)
             total_max = round(price + service_fee + CONFIG["shipping_max"], 2)
             items.append({
-                "id": iid,
-                "url": f"https://{CONFIG['domain']}/items/{iid}",
-                "title": title,
-                "brand": search_query,
-                "price": price,
-                "size": size_title,
-                "zustand": get_zustand(item),
-                "photo": photo,
+                "id": iid, "url": f"https://{CONFIG['domain']}/items/{iid}",
+                "title": title, "brand": search_query, "price": price, "size": size_title,
+                "zustand": get_zustand(item), "photo": photo,
                 "time": datetime.now().strftime("%H:%M:%S"),
-                "description": "",
-                "service_fee": service_fee,
-                "shipping_min": CONFIG["shipping_min"],
-                "shipping_max": CONFIG["shipping_max"],
-                "total_min": total_min,
-                "total_max": total_max,
-                "has_defect": False,
+                "description": "", "service_fee": service_fee,
+                "shipping_min": CONFIG["shipping_min"], "shipping_max": CONFIG["shipping_max"],
+                "total_min": total_min, "total_max": total_max, "has_defect": False,
             })
         return items
     except Exception as e:
@@ -311,7 +285,7 @@ def enrich_item(driver, item):
 
 def send_discord(item):
     if not DISCORD_WEBHOOK:
-        log("Kein Discord Webhook konfiguriert!")
+        log("Kein Webhook!")
         return
     try:
         mangel_text = "⚠️ MÄNGEL ERWÄHNT!" if item["has_defect"] else "✅ Keine Mängel"
@@ -330,15 +304,12 @@ def send_discord(item):
         if item["description"]:
             fields.append({"name": "📝 Beschreibung", "value": item["description"], "inline": False})
         embed = {
-            "title": f"🎯 {item['title']}",
-            "url": item["url"],
-            "color": color,
-            "image": {"url": item["photo"]},
-            "fields": fields,
+            "title": f"🎯 {item['title']}", "url": item["url"], "color": color,
+            "image": {"url": item["photo"]}, "fields": fields,
             "footer": {"text": f"Vinted Snipe Bot | {item['time']}"},
         }
         r = req_lib.post(DISCORD_WEBHOOK, json={"embeds": [embed]}, timeout=10)
-        log(f"Discord gesendet: {r.status_code}")
+        log(f"Discord: {r.status_code}")
     except Exception as e:
         log(f"Discord Fehler: {e}")
 
@@ -362,17 +333,17 @@ def bot_loop():
                             item = enrich_item(driver, item)
                             send_discord(item)
                             total_found += 1
-                            log(f"NEU: {item['title']} | {item['total_min']}-{item['total_max']}€ | {item['zustand']}")
+                            log(f"NEU: {item['title']} | {item['total_min']}-{item['total_max']}€")
                 time.sleep(1)
             if first_run:
-                log(f"Erstinitialisierung: {len(seen_ids)} Artikel markiert. Ab jetzt werden neue gemeldet.")
+                log(f"Erstinitialisierung: {len(seen_ids)} Artikel. Ab jetzt neue melden.")
                 first_run = False
             save_seen_ids()
-            bot_status = f"Läuft ✅ | Treffer: {total_found} | {datetime.now().strftime('%H:%M:%S')}"
+            bot_status = f"✅ Läuft | Treffer: {total_found} | {datetime.now().strftime('%H:%M:%S')}"
             time.sleep(CONFIG["poll_interval"])
         except Exception as e:
-            bot_status = f"Fehler: {e}"
-            log(f"FEHLER im Bot-Loop: {e}")
+            bot_status = f"❌ Fehler: {e}"
+            log(f"FEHLER: {e}")
             try:
                 if driver:
                     driver.quit()
@@ -388,9 +359,11 @@ app = Flask(__name__)
 def home():
     logs_html = "<br>".join(bot_log[-30:])
     return f"""
+    <html><body style="background:#0d1117;color:white;font-family:Arial;padding:20px">
     <h2>🎯 Vinted Snipe Bot</h2>
     <b>Status:</b> {bot_status}<br><br>
-    <b>Log:</b><br>{logs_html}
+    <b>Log:</b><br><small>{logs_html}</small>
+    </body></html>
     """
 
 threading.Thread(target=bot_loop, daemon=True).start()
