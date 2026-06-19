@@ -12,54 +12,80 @@ from selenium.webdriver.support import expected_conditions as EC
 CONFIG = {
     "domain": "www.vinted.de",
     "price_max": 7,
-    # Breite Suche nach Marke – Filter passiert lokal
+
+    # Jede Marke hat eigene Suchbegriff + erlaubte Kategorien
     "brands": [
-        "Tommy Hilfiger",
-        "Ralph Lauren",
-        "Nike",
-        "Adidas",
-        "Lacoste",
-        "Puma",
-        "Levis",
+        {
+            "search": "Tommy Hilfiger",
+            "name": "Tommy Hilfiger",
+            "require_one_of": ["polo", "short", "shorts", "hemd", "shirt"],
+            "must_not_have": ["hose", "hosen", "jeans", "jogger", "unterwäsche",
+                              "unterhose", "strumpf", "socken"],
+        },
+        {
+            "search": "Ralph Lauren",
+            "name": "Ralph Lauren",
+            "require_one_of": ["polo", "short", "shorts", "hemd", "shirt"],
+            "must_not_have": ["hose", "hosen", "jeans", "jogger", "unterwäsche",
+                              "unterhose", "strumpf", "socken"],
+        },
+        {
+            "search": "Lacoste",
+            "name": "Lacoste",
+            "require_one_of": ["polo", "short", "shorts", "hemd", "shirt"],
+            "must_not_have": ["hose", "hosen", "jeans", "jogger", "unterwäsche",
+                              "unterhose", "strumpf", "socken"],
+        },
+        {
+            "search": "Nike Polo",
+            "name": "Nike",
+            "require_one_of": ["polo"],
+            "must_not_have": ["hose", "hosen", "short", "shorts", "unterwäsche",
+                              "unterhose", "socken", "shirt", "tshirt", "t-shirt"],
+        },
+        {
+            "search": "Adidas Polo",
+            "name": "Adidas",
+            "require_one_of": ["polo"],
+            "must_not_have": ["hose", "hosen", "short", "shorts", "unterwäsche",
+                              "unterhose", "socken", "shirt", "tshirt", "t-shirt"],
+        },
+        {
+            "search": "Puma Trikot",
+            "name": "Puma",
+            "require_one_of": ["trikot", "fußball", "fussball", "football",
+                               "soccer", "torwart"],
+            "must_not_have": ["hose", "hosen", "unterwäsche", "unterhose", "socken"],
+        },
+        {
+            "search": "Levis Shorts",
+            "name": "Levis",
+            "require_one_of": ["short", "shorts"],
+            "must_not_have": ["hose", "hosen", "jeans hose", "unterwäsche",
+                              "unterhose"],
+        },
     ],
-    # Was pro Marke ERLAUBT ist (mindestens eines muss im Titel stehen)
-    "brand_allowed_keywords": {
-        "Tommy Hilfiger": ["polo", "short", "shorts"],
-        "Ralph Lauren": ["polo", "short", "shorts"],
-        "Lacoste": ["polo", "short", "shorts"],
-        "Nike": ["polo"],
-        "Adidas": ["polo"],
-        "Puma": ["fußball", "fussball", "football", "trikot", "soccer", "torwart"],
-        "Levis": ["short", "shorts", "501", "511", "512", "514"],
-    },
-    # Was IMMER verboten ist (egal welche Marke)
-    "exclude_keywords": [
-        # Schuhe
+
+    # Diese Wörter führen immer zum Ausschluss, egal welche Marke
+    "global_exclude": [
         "schuhe", "sneaker", "boots", "stiefel", "sandalen", "turnschuhe",
         "loafer", "pumps", "schuh", "shoe", "shoes", "slipper",
         "absatz", "ballerina", "clogs", "crocs", "jordan", "yeezy",
         "vans", "converse", "hausschuhe", "flip flop", "sandale",
-        # Accessoires
         "mütze", "cap", "beanie", "hut", "kappe", "snapback",
         "gürtel", "tasche", "bag", "rucksack", "parfum", "uhr",
         "schmuck", "brille", "handschuhe", "schal", "armband", "kette", "ring",
-        # Unterwäsche
         "unterwäsche", "unterhose", "unterhosen", "unterhemd", "unterhemden",
-        "boxer", "boxershorts", "slip", "bh", "strumpf", "tanga", "tangas",
-        "string", "socken",
-        # Damenbekleidung / Kinder
+        "boxer", "boxershorts", "slip", "bh", "strumpf", "tanga", "tangas", "string",
+        "socken", "strümpfe",
         "kleid", "kleider", "rock", "bluse", "leggings",
         "bikini", "badeanzug", "bademode",
         "baby", "kinder", "mädchen", "kids",
-        # Sonstiges
         "pyjama", "schlafanzug", "kostüm", "krawatte",
-        # Hosen (ALLE)
         "hose", "hosen", "jogginghose", "trainingshose", "jogger",
-        "stoffhose",
-        # Oberbekleidung die wir nicht wollen
-        "mantel", "weste",
-        "longsleeve", "sweatshirt",
+        "chino", "chinos", "stoffhose",
     ],
+
     "defect_negations": [
         "keine fleck", "kein fleck", "ohne fleck",
         "keine mängel", "kein mangel", "ohne mängel",
@@ -82,6 +108,7 @@ CONFIG = {
         "gerissen", "abgerissen", "verwaschen", "ausgewaschen",
         "knopf fehlt", "knopf ab",
     ],
+
     "shipping_min": 3.0,
     "shipping_max": 5.0,
     "poll_interval": 20,
@@ -89,7 +116,6 @@ CONFIG = {
 }
 
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "")
-
 seen_ids = set()
 total_found = 0
 bot_status = "Startet..."
@@ -143,14 +169,17 @@ def get_price(raw):
 def calc_service_fee(price):
     return round(price * 0.05 + 0.70, 2)
 
-def is_valid_title(title, brand):
+def is_valid_title(title, brand_config):
     t = title.lower()
-    # Erst ausschliessen
-    if any(w in t for w in CONFIG["exclude_keywords"]):
+    # Globale Ausschlüsse
+    if any(w in t for w in CONFIG["global_exclude"]):
         return False
-    # Dann prüfen ob erlaubtes Keyword vorhanden
-    allowed = CONFIG["brand_allowed_keywords"].get(brand, [])
-    if allowed and not any(w in t for w in allowed):
+    # Marken-spezifische Ausschlüsse
+    if any(w in t for w in brand_config.get("must_not_have", [])):
+        return False
+    # Mindestens eines dieser Wörter muss im Titel sein
+    required = brand_config.get("require_one_of", [])
+    if required and not any(w in t for w in required):
         return False
     return True
 
@@ -192,11 +221,8 @@ CONDITION_MAP = {
     "fair": "🔴 Akzeptabel",
 }
 CONDITION_ID_MAP = {
-    6: "🟢 Neu mit Etikett",
-    1: "🟡 Neu ohne Etikett",
-    2: "🔵 Sehr gut",
-    3: "🟠 Gut",
-    4: "🔴 Zufriedenstellend",
+    6: "🟢 Neu mit Etikett", 1: "🟡 Neu ohne Etikett",
+    2: "🔵 Sehr gut", 3: "🟠 Gut", 4: "🔴 Zufriedenstellend",
 }
 
 def get_zustand(data):
@@ -247,10 +273,12 @@ def setup(driver):
     except:
         log("Cookies OK.")
 
-def fetch_items(driver, brand):
+def fetch_items(driver, brand_config):
+    search = brand_config["search"].replace(" ", "+")
+    url = f"https://{CONFIG['domain']}/api/v2/catalog/items?search_text={search}&price_to={CONFIG['price_max']}&order=newest_first&status_ids[]=6&status_ids[]=1&status_ids[]=2&status_ids[]=3&per_page=96"
     js = f"""
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://{CONFIG["domain"]}/api/v2/catalog/items?search_text={brand.replace(" ", "+")}&price_to={CONFIG["price_max"]}&order=newest_first&status_ids[]=6&status_ids[]=1&status_ids[]=2&per_page=96', false);
+    xhr.open('GET', '{url}', false);
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.send();
     return xhr.responseText;
@@ -261,12 +289,15 @@ def fetch_items(driver, brand):
             return []
         data = json.loads(response)
         items = []
-        total_raw = len(data.get("items", []))
         for item in data.get("items", []):
-            title = item.get("title", brand)
+            title = item.get("title", "")
             iid = str(item.get("id", ""))
             size_title = item.get("size_title", "") or ""
-            if not iid or not is_valid_title(title, brand) or not is_valid_size(size_title):
+            if not iid:
+                continue
+            if not is_valid_title(title, brand_config):
+                continue
+            if not is_valid_size(size_title):
                 continue
             photo = ""
             try:
@@ -281,7 +312,7 @@ def fetch_items(driver, brand):
                 "id": iid,
                 "url": f"https://{CONFIG['domain']}/items/{iid}",
                 "title": title,
-                "brand": brand,
+                "brand": brand_config["name"],
                 "price": price,
                 "size": size_title,
                 "zustand": get_zustand(item),
@@ -295,11 +326,10 @@ def fetch_items(driver, brand):
                 "total_max": total_max,
                 "has_defect": False,
             })
-        log(f"[{brand}] {total_raw} gefunden → {len(items)} nach Filter")
         return items
     except Exception as e:
         if "Expecting value" not in str(e):
-            log(f"Fehler ({brand}): {e}")
+            log(f"Fehler ({brand_config['name']}): {e}")
         return []
 
 def enrich_item(driver, item):
@@ -360,7 +390,7 @@ def send_discord(item):
             "footer": {"text": f"Vinted Snipe Bot | {item['time']}"},
         }
         r = req_lib.post(DISCORD_WEBHOOK, json={"embeds": [embed]}, timeout=10)
-        log(f"Discord gesendet ({r.status_code}): {item['title']}")
+        log(f"Discord OK: {item['title'][:40]} ({r.status_code})")
     except Exception as e:
         log(f"Discord Fehler: {e}")
 
@@ -374,8 +404,9 @@ def bot_loop():
             if driver is None:
                 driver = start_browser()
                 setup(driver)
-            for brand in CONFIG["brands"]:
-                items = fetch_items(driver, brand)
+            for brand_config in CONFIG["brands"]:
+                items = fetch_items(driver, brand_config)
+                log(f"[{brand_config['name']}] {len(items)} passende Artikel")
                 for item in items:
                     if item["id"] not in seen_ids:
                         seen_ids.add(item["id"])
@@ -383,9 +414,10 @@ def bot_loop():
                             item = enrich_item(driver, item)
                             send_discord(item)
                             total_found += 1
-                time.sleep(1)
+                            log(f"NEU ✅ {item['title']} | {item['total_min']}-{item['total_max']}€ | {item['zustand']}")
+                time.sleep(2)
             if first_run:
-                log(f"Erstinitialisierung: {len(seen_ids)} Artikel markiert. Ab jetzt neue melden!")
+                log(f"Erstinitialisierung fertig: {len(seen_ids)} Artikel markiert. Ab jetzt kommen neue auf Discord!")
                 first_run = False
             save_seen_ids()
             bot_status = f"✅ Läuft | Treffer: {total_found} | {datetime.now().strftime('%H:%M:%S')}"
@@ -406,13 +438,15 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    logs_html = "<br>".join(bot_log[-40:])
+    logs_html = "<br>".join(reversed(bot_log[-40:]))
     return f"""
-    <html><body style="background:#0d1117;color:white;font-family:Arial;padding:20px">
+    <html><body style="background:#0d1117;color:white;font-family:Arial;padding:20px;font-size:14px">
     <h2>🎯 Vinted Snipe Bot</h2>
     <p><b>Status:</b> {bot_status}</p>
-    <p><b>Log:</b></p>
-    <small style="color:#aaa">{logs_html}</small>
+    <p><b>Gesamte Treffer:</b> {total_found}</p>
+    <hr style="border-color:#333;margin:15px 0">
+    <p><b>Live Log:</b></p>
+    <p style="font-size:12px;color:#aaa;line-height:1.8">{logs_html}</p>
     </body></html>
     """
 
