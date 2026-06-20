@@ -1,5 +1,5 @@
 import json, os, re, threading, time
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from flask import Flask
 import requests as req_lib
 from selenium import webdriver
@@ -9,79 +9,77 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+# Deutsche Zeit (UTC+2 im Sommer)
+DE = timezone(timedelta(hours=2))
+def jetzt():
+    return datetime.now(DE).strftime("%H:%M:%S")
+
 CONFIG = {
     "domain": "www.vinted.de",
     "price_max": 7,
-    "max_age_hours": 6,  # Nur Artikel die max 6 Stunden alt sind
+    "max_age_seconds": 4 * 3600,
     "brands": [
-        # Tommy Hilfiger - Polos UND Shorts erlaubt
         {
             "search": "Tommy Hilfiger",
             "name": "Tommy Hilfiger",
             "require_one_of": ["polo", "poloshirt", "short", "shorts"],
             "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose",
-                        "unterhemd", "boxer", "socken", "strumpf", "jeans",
-                        "jacke", "mantel", "hoodie", "pullover"],
+                        "unterhemd", "boxer", "socken", "jeans", "jacke",
+                        "mantel", "hoodie", "pullover", "check24"],
         },
-        # Ralph Lauren - Polos UND Shorts erlaubt
         {
             "search": "Ralph Lauren",
             "name": "Ralph Lauren",
             "require_one_of": ["polo", "poloshirt", "short", "shorts"],
             "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose",
-                        "unterhemd", "boxer", "socken", "strumpf", "jeans",
-                        "jacke", "mantel", "hoodie", "pullover"],
+                        "unterhemd", "boxer", "socken", "jeans", "jacke",
+                        "mantel", "hoodie", "pullover", "check24"],
         },
-        # Lacoste - Polos UND Shorts erlaubt
         {
             "search": "Lacoste",
             "name": "Lacoste",
             "require_one_of": ["polo", "poloshirt", "short", "shorts"],
             "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose",
-                        "unterhemd", "boxer", "socken", "strumpf", "jeans",
-                        "jacke", "mantel", "hoodie", "pullover"],
+                        "unterhemd", "boxer", "socken", "jeans", "jacke",
+                        "mantel", "check24"],
         },
-        # Nike - Polos UND Fussball
         {
             "search": "Nike Polo",
-            "name": "Nike",
+            "name": "Nike Polo",
             "require_one_of": ["polo", "poloshirt"],
             "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken",
-                        "shorts", "short", "jacke"],
+                        "shorts", "short", "jacke", "check24"],
         },
         {
             "search": "Nike Trikot",
             "name": "Nike Fussball",
             "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken"],
+            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"],
         },
-        # Adidas - hauptsächlich Fussball, auch Polo
         {
             "search": "Adidas Trikot",
             "name": "Adidas Fussball",
             "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken"],
+            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"],
         },
         {
             "search": "Adidas Polo",
-            "name": "Adidas",
+            "name": "Adidas Polo",
             "require_one_of": ["polo", "poloshirt"],
             "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken",
-                        "shorts", "short", "jacke"],
+                        "shorts", "short", "jacke", "check24"],
         },
-        # Puma - nur Fussball
         {
             "search": "Puma Trikot",
-            "name": "Puma",
+            "name": "Puma Fussball",
             "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken"],
+            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"],
         },
-        # Levis - nur Shorts
         {
             "search": "Levis Shorts",
             "name": "Levis",
             "require_one_of": ["short", "shorts"],
-            "exclude": ["hose", "hosen", "jeans hose", "unterwäsche", "unterhose"],
+            "exclude": ["hose", "hosen", "jeans hose", "unterwäsche", "unterhose", "check24"],
         },
     ],
     "global_exclude": [
@@ -93,40 +91,28 @@ CONFIG = {
         "gürtel", "tasche", "bag", "rucksack", "parfum", "uhr",
         "schmuck", "brille", "handschuhe", "schal", "armband", "kette", "ring",
         "unterwäsche", "unterhose", "unterhosen", "unterhemd",
-        "boxer", "boxershorts", "slip", "bh",
-        "tanga", "tangas", "string",
-        "socken", "strümpfe",
-        "kleid", "kleider", "rock", "bluse", "leggings",
-        "bikini", "badeanzug",
-        "baby", "kinder", "mädchen", "kids",
-        "pyjama", "schlafanzug", "kostüm", "krawatte",
+        "boxer", "boxershorts", "slip", "bh", "tanga", "tangas", "string",
+        "socken", "strümpfe", "kleid", "kleider", "rock", "bluse", "leggings",
+        "bikini", "badeanzug", "baby", "kinder", "mädchen", "kids",
+        "pyjama", "schlafanzug", "kostüm", "krawatte", "check24",
     ],
     "defect_negations": [
         "keine fleck", "kein fleck", "ohne fleck",
-        "keine mängel", "kein mangel", "ohne mängel", "ohne mängel",
+        "keine mängel", "kein mangel", "ohne mängel",
         "keine beschädigung", "kein schaden", "ohne schaden",
         "makellos", "einwandfrei", "neuwertig", "tadellos",
         "keine kratzer", "keine löcher", "keine risse",
-        "no stain", "no damage", "no defect",
     ],
     "defect_keywords": [
-        "fleck", "flecken", "blutfleck", "ölfleck", "weinfleck", "kaffeefleck",
+        "fleck", "flecken", "blutfleck", "ölfleck",
         "riss", "risse", "einriss", "gerissen",
-        "loch", "löcher",
-        "beschädigt", "beschädigung",
-        "defekt", "kaputt",
-        "kratzer",
-        "abgenutzt", "abnutzung",
-        "ausgeblichen", "verblasst", "farbabweichung", "verfärbt", "verfärbung",
-        "makel",
-        "gebrauchsspuren",
-        "pilling", "pillen", "fussel",
-        "stain", "hole", "rip", "tear", "damaged", "worn",
-        "schaden", "mangel", "mängel",
-        "dreckig", "schmutzig",
-        "abgerissen", "verwaschen", "ausgewaschen",
-        "knopf fehlt", "knopf ab", "knopf weg",
-        "naht offen", "naht gerissen",
+        "loch", "löcher", "beschädigt", "beschädigung",
+        "defekt", "kaputt", "kratzer", "abgenutzt",
+        "ausgeblichen", "verblasst", "makel", "gebrauchsspuren",
+        "pilling", "fussel", "stain", "hole", "damaged", "worn",
+        "verfärbt", "verfärbung", "schaden", "mangel", "mängel",
+        "dreckig", "schmutzig", "abgerissen", "verwaschen",
+        "ausgewaschen", "knopf fehlt", "knopf ab",
     ],
     "shipping_min": 3.0,
     "shipping_max": 5.0,
@@ -142,8 +128,7 @@ bot_log = []
 
 def log(msg):
     global bot_log
-    ts = datetime.now().strftime("%H:%M:%S")
-    line = f"[{ts}] {msg}"
+    line = f"[{jetzt()}] {msg}"
     print(line, flush=True)
     bot_log.append(line)
     if len(bot_log) > 100:
@@ -213,8 +198,7 @@ def is_fresh(item):
     ts = item.get("created_at_ts") or item.get("created_at") or 0
     if not ts:
         return True
-    max_age = CONFIG["max_age_hours"] * 3600
-    return (time.time() - float(ts)) < max_age
+    return (time.time() - float(ts)) < CONFIG["max_age_seconds"]
 
 def check_defects(title, desc):
     text = (title + " " + desc).lower()
@@ -345,7 +329,7 @@ def fetch_items(driver, brand_config):
                 "size": size_title,
                 "zustand": get_zustand(item),
                 "photo": photo,
-                "time": datetime.now().strftime("%H:%M:%S"),
+                "time": jetzt(),
                 "description": "",
                 "service_fee": service_fee,
                 "shipping_min": CONFIG["shipping_min"],
@@ -387,7 +371,7 @@ def enrich_item(driver, item):
         item["total_max"] = round(price + service_fee + CONFIG["shipping_max"], 2)
         item["has_defect"] = check_defects(item["title"], desc)
         if item["has_defect"]:
-            log(f"⚠️ Mängel erkannt bei: {item['title'][:40]}")
+            log(f"⚠️ Mängel: {item['title'][:40]}")
     except Exception as e:
         log(f"Enrich Fehler: {e}")
     return item
@@ -410,18 +394,14 @@ def send_discord(item):
             {"name": "🔗 Link", "value": item["url"], "inline": False},
         ]
         if item["description"]:
-            fields.append({
-                "name": "📝 Beschreibung",
-                "value": item["description"][:300],
-                "inline": False
-            })
+            fields.append({"name": "📝 Beschreibung", "value": item["description"][:300], "inline": False})
         embed = {
             "title": f"🎯 {item['title']}",
             "url": item["url"],
             "color": color,
             "image": {"url": item["photo"]},
             "fields": fields,
-            "footer": {"text": f"Vinted Snipe Bot | {item['time']}"},
+            "footer": {"text": f"Vinted Snipe Bot | {item['time']} Uhr (DE)"},
         }
         r = req_lib.post(DISCORD_WEBHOOK, json={"embeds": [embed]}, timeout=10)
         log(f"✅ Discord: {item['title'][:35]} ({r.status_code})")
@@ -447,11 +427,11 @@ def bot_loop():
                         send_discord(item)
                         total_found += 1
                         neu += 1
-                        log(f"NEU: {item['title'][:40]} | {item['total_min']}-{item['total_max']}€ | {item['zustand']}")
-                log(f"[{brand_config['name']}] {len(items)} gefunden, {neu} neu")
+                        log(f"🎯 NEU [{item['brand']}] {item['title'][:35]} | {item['total_min']}-{item['total_max']}€ | {item['zustand']}")
+                log(f"[{brand_config['name']}] {len(items)} Artikel, {neu} NEU")
                 time.sleep(2)
             save_seen_ids()
-            bot_status = f"✅ Läuft | Treffer heute: {total_found} | {datetime.now().strftime('%H:%M:%S')}"
+            bot_status = f"✅ Läuft | Treffer: {total_found} | {jetzt()} Uhr (DE)"
             time.sleep(CONFIG["poll_interval"])
         except Exception as e:
             bot_status = f"❌ Fehler: {e}"
@@ -475,7 +455,7 @@ def home():
     <p><b>Status:</b> {bot_status}</p>
     <p><b>Treffer gesamt:</b> {total_found}</p>
     <hr style="border-color:#333;margin:15px 0">
-    <p><b>Live Log:</b></p>
+    <p><b>Live Log (Deutsche Zeit):</b></p>
     <p style="font-size:12px;color:#aaa;line-height:2">{logs_html}</p>
     </body></html>"""
 
