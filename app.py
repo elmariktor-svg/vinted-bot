@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 from flask import Flask
 import requests as req_lib
 from selenium import webdriver
-from selenium.webdriver.by import By
+from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
@@ -13,74 +13,42 @@ DE = timezone(timedelta(hours=2))
 def jetzt():
     return datetime.now(DE).strftime("%H:%M:%S")
 
-BOT_START_TIME = time.time()  # Merkt sich wann der Bot gestartet ist
-
 CONFIG = {
     "domain": "www.vinted.de",
     "price_max": 7,
     "brands": [
-        {
-            "search": "Tommy Hilfiger",
-            "name": "Tommy Hilfiger",
-            "require_one_of": ["polo", "poloshirt", "short", "shorts"],
-            "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose",
-                        "unterhemd", "boxer", "socken", "jeans", "jacke",
-                        "mantel", "hoodie", "pullover", "check24"],
-        },
-        {
-            "search": "Ralph Lauren",
-            "name": "Ralph Lauren",
-            "require_one_of": ["polo", "poloshirt", "short", "shorts"],
-            "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose",
-                        "unterhemd", "boxer", "socken", "jeans", "jacke",
-                        "mantel", "hoodie", "pullover", "check24"],
-        },
-        {
-            "search": "Lacoste",
-            "name": "Lacoste",
-            "require_one_of": ["polo", "poloshirt", "short", "shorts"],
-            "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose",
-                        "unterhemd", "boxer", "socken", "jeans", "jacke",
-                        "mantel", "check24"],
-        },
-        {
-            "search": "Nike Polo",
-            "name": "Nike Polo",
-            "require_one_of": ["polo", "poloshirt"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken",
-                        "shorts", "short", "jacke", "check24"],
-        },
-        {
-            "search": "Nike Trikot",
-            "name": "Nike Fussball",
-            "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"],
-        },
-        {
-            "search": "Adidas Trikot",
-            "name": "Adidas Fussball",
-            "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"],
-        },
-        {
-            "search": "Adidas Polo",
-            "name": "Adidas Polo",
-            "require_one_of": ["polo", "poloshirt"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken",
-                        "shorts", "short", "jacke", "check24"],
-        },
-        {
-            "search": "Puma Trikot",
-            "name": "Puma Fussball",
-            "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"],
-        },
-        {
-            "search": "Levis Shorts",
-            "name": "Levis",
-            "require_one_of": ["short", "shorts"],
-            "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "check24"],
-        },
+        {"search": "Tommy Hilfiger", "name": "Tommy Hilfiger",
+         "require_one_of": ["polo", "poloshirt", "short", "shorts"],
+         "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose", "unterhemd",
+                     "boxer", "socken", "jeans", "jacke", "mantel", "hoodie", "pullover", "check24"]},
+        {"search": "Ralph Lauren", "name": "Ralph Lauren",
+         "require_one_of": ["polo", "poloshirt", "short", "shorts"],
+         "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose", "unterhemd",
+                     "boxer", "socken", "jeans", "jacke", "mantel", "hoodie", "pullover", "check24"]},
+        {"search": "Lacoste", "name": "Lacoste",
+         "require_one_of": ["polo", "poloshirt", "short", "shorts"],
+         "exclude": ["hose", "hosen", "jogger", "unterwäsche", "unterhose", "unterhemd",
+                     "boxer", "socken", "jeans", "jacke", "mantel", "check24"]},
+        {"search": "Nike Polo", "name": "Nike Polo",
+         "require_one_of": ["polo", "poloshirt"],
+         "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken",
+                     "shorts", "short", "jacke", "check24"]},
+        {"search": "Nike Trikot", "name": "Nike Fussball",
+         "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
+         "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"]},
+        {"search": "Adidas Trikot", "name": "Adidas Fussball",
+         "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
+         "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"]},
+        {"search": "Adidas Polo", "name": "Adidas Polo",
+         "require_one_of": ["polo", "poloshirt"],
+         "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken",
+                     "shorts", "short", "jacke", "check24"]},
+        {"search": "Puma Trikot", "name": "Puma Fussball",
+         "require_one_of": ["trikot", "fußball", "fussball", "football", "soccer"],
+         "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "socken", "check24"]},
+        {"search": "Levis Shorts", "name": "Levis",
+         "require_one_of": ["short", "shorts"],
+         "exclude": ["hose", "hosen", "unterwäsche", "unterhose", "check24"]},
     ],
     "global_exclude": [
         "schuhe", "sneaker", "boots", "stiefel", "sandalen", "turnschuhe",
@@ -96,27 +64,23 @@ CONFIG = {
         "kids", "pyjama", "schlafanzug", "kostüm", "krawatte", "check24",
     ],
     "defect_negations": [
-        "keine fleck", "kein fleck", "ohne fleck",
-        "keine mängel", "kein mangel", "ohne mängel",
-        "keine beschädigung", "kein schaden", "ohne schaden",
-        "makellos", "einwandfrei", "neuwertig", "tadellos",
+        "keine fleck", "kein fleck", "ohne fleck", "keine mängel",
+        "kein mangel", "ohne mängel", "keine beschädigung", "kein schaden",
+        "ohne schaden", "makellos", "einwandfrei", "neuwertig", "tadellos",
         "keine kratzer", "keine löcher", "keine risse",
     ],
     "defect_keywords": [
-        "fleck", "flecken", "blutfleck", "ölfleck",
-        "riss", "risse", "einriss", "gerissen",
-        "loch", "löcher", "beschädigt", "beschädigung",
-        "defekt", "kaputt", "kratzer", "abgenutzt",
-        "ausgeblichen", "verblasst", "makel", "gebrauchsspuren",
-        "pilling", "fussel", "stain", "hole", "damaged", "worn",
-        "verfärbt", "verfärbung", "schaden", "mangel", "mängel",
-        "dreckig", "schmutzig", "abgerissen", "verwaschen",
-        "ausgewaschen", "knopf fehlt", "knopf ab",
+        "fleck", "flecken", "blutfleck", "ölfleck", "riss", "risse",
+        "einriss", "gerissen", "loch", "löcher", "beschädigt", "defekt",
+        "kaputt", "kratzer", "abgenutzt", "ausgeblichen", "verblasst",
+        "makel", "gebrauchsspuren", "pilling", "stain", "hole", "damaged",
+        "worn", "verfärbt", "schaden", "mangel", "mängel", "dreckig",
+        "schmutzig", "abgerissen", "verwaschen", "knopf fehlt",
     ],
     "shipping_min": 3.0,
     "shipping_max": 5.0,
     "poll_interval": 20,
-    "browser_restart_minutes": 25,
+    "browser_restart_min": 20,
     "seen_ids_file": "seen_ids.json",
 }
 
@@ -127,26 +91,30 @@ seen_ids = set()
 total_found = 0
 bot_status = "Startet..."
 bot_log = []
+first_run = True
 
 def log(msg):
     global bot_log
     line = f"[{jetzt()}] {msg}"
     print(line, flush=True)
     bot_log.append(line)
-    if len(bot_log) > 150:
-        bot_log = bot_log[-150:]
+    if len(bot_log) > 200:
+        bot_log = bot_log[-200:]
 
 def load_seen_ids():
-    global seen_ids
+    global seen_ids, first_run
     if os.path.exists(CONFIG["seen_ids_file"]):
         try:
             with open(CONFIG["seen_ids_file"]) as f:
                 seen_ids = set(json.load(f))
+            first_run = len(seen_ids) == 0
             log(f"{len(seen_ids)} bekannte Artikel geladen.")
         except:
             seen_ids = set()
+            first_run = True
     else:
-        log("Keine gespeicherten IDs – starte frisch.")
+        first_run = True
+        log("Starte frisch.")
 
 def save_seen_ids():
     try:
@@ -196,13 +164,6 @@ def is_valid_size(size_title):
         return True
     return False
 
-def was_listed_after_botstart(item):
-    """Nur Artikel die NACH Botstart eingestellt wurden."""
-    ts = item.get("created_at_ts") or item.get("created_at") or 0
-    if not ts:
-        return False
-    return float(ts) >= BOT_START_TIME
-
 def check_defects(title, desc):
     text = (title + " " + desc).lower()
     for neg in CONFIG["defect_negations"]:
@@ -227,10 +188,8 @@ CONDITION_MAP = {
     "good": "🟠 Gut",
 }
 CONDITION_ID_MAP = {
-    6: "🟢 Neu mit Etikett",
-    1: "🟡 Neu ohne Etikett",
-    2: "🔵 Sehr gut",
-    3: "🟠 Gut",
+    6: "🟢 Neu mit Etikett", 1: "🟡 Neu ohne Etikett",
+    2: "🔵 Sehr gut", 3: "🟠 Gut",
 }
 
 def get_zustand(data):
@@ -263,7 +222,6 @@ def start_browser():
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1280,720")
     options.add_argument("--disable-extensions")
-    options.add_argument("--disable-images")
     options.binary_location = "/usr/bin/chromium"
     service = Service("/usr/bin/chromedriver")
     driver = webdriver.Chrome(service=service, options=options)
@@ -283,6 +241,20 @@ def setup(driver):
     except:
         log("Cookies OK.")
 
+def renew_session(driver):
+    try:
+        driver.get(f"https://{CONFIG['domain']}")
+        time.sleep(3)
+        try:
+            WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.ID, "onetrust-accept-btn-handler"))
+            ).click()
+            time.sleep(2)
+        except:
+            pass
+    except:
+        pass
+
 def fetch_items(driver, brand_config):
     search = brand_config["search"].replace(" ", "+")
     url = (f"https://{CONFIG['domain']}/api/v2/catalog/items"
@@ -301,26 +273,19 @@ def fetch_items(driver, brand_config):
     try:
         response = driver.execute_script(js)
         if not response or response.strip() == "":
-            return [], []
+            renew_session(driver)
+            return []
         data = json.loads(response)
-        new_items = []
-        all_ids = []
+        items = []
         for item in data.get("items", []):
             title = item.get("title", "")
             iid = str(item.get("id", ""))
             size_title = item.get("size_title", "") or ""
-            if not iid:
+            if not iid or iid in seen_ids:
                 continue
-            all_ids.append(iid)
             if not is_valid_title(title, brand_config):
                 continue
             if not is_valid_size(size_title):
-                continue
-            if iid in seen_ids:
-                continue
-            # Nur senden wenn NACH Botstart eingestellt
-            if not was_listed_after_botstart(item):
-                seen_ids.add(iid)  # Als gesehen markieren aber nicht senden
                 continue
             photo = ""
             try:
@@ -331,7 +296,7 @@ def fetch_items(driver, brand_config):
             service_fee = get_price(item.get("service_fee", 0)) or calc_service_fee(price)
             total_min = round(price + service_fee + CONFIG["shipping_min"], 2)
             total_max = round(price + service_fee + CONFIG["shipping_max"], 2)
-            new_items.append({
+            items.append({
                 "id": iid,
                 "url": f"https://{CONFIG['domain']}/items/{iid}",
                 "title": title,
@@ -349,11 +314,11 @@ def fetch_items(driver, brand_config):
                 "total_max": total_max,
                 "has_defect": False,
             })
-        return new_items, all_ids
+        return items
     except Exception as e:
         if "Expecting value" not in str(e):
             log(f"Fehler ({brand_config['name']}): {e}")
-        return [], []
+        return []
 
 def enrich_item(driver, item):
     js = f"""
@@ -382,16 +347,16 @@ def enrich_item(driver, item):
         item["total_max"] = round(price + service_fee + CONFIG["shipping_max"], 2)
         item["has_defect"] = check_defects(item["title"], desc)
         if item["has_defect"]:
-            log(f"⚠️ Mängel erkannt: {item['title'][:40]}")
-    except Exception as e:
-        log(f"Enrich Fehler: {e}")
+            log(f"⚠️ Mängel: {item['title'][:40]}")
+    except:
+        pass
     return item
 
 def send_discord(item):
     if not DISCORD_WEBHOOK:
         return
     try:
-        mangel_text = "⚠️ MÄNGEL ERWÄHNT – PRÜFEN!" if item["has_defect"] else "✅ Keine Mängel"
+        mangel_text = "⚠️ MÄNGEL – PRÜFEN!" if item["has_defect"] else "✅ Keine Mängel"
         color = 0xff4444 if item["has_defect"] else 0x00ff88
         fields = [
             {"name": "💶 Artikelpreis", "value": f"**{item['price']}€**", "inline": True},
@@ -415,59 +380,63 @@ def send_discord(item):
             "footer": {"text": f"Vinted Bot | {item['time']} Uhr (DE)"},
         }
         r = req_lib.post(DISCORD_WEBHOOK, json={"embeds": [embed]}, timeout=10)
-        log(f"✅ Discord OK: {item['title'][:35]} ({r.status_code})")
+        log(f"✅ Discord: {item['title'][:35]} ({r.status_code})")
     except Exception as e:
         log(f"Discord Fehler: {e}")
 
-def self_ping_loop():
-    """Hält Render wach durch regelmäßige Selbst-Pings."""
-    time.sleep(60)
-    url = RENDER_URL or "http://localhost:10000"
+def self_ping():
+    time.sleep(120)
+    url = RENDER_URL if RENDER_URL else "http://localhost:10000"
     while True:
         try:
             req_lib.get(url, timeout=10)
-            log("🔄 Self-ping OK")
         except:
             pass
-        time.sleep(8 * 60)  # Alle 8 Minuten
+        time.sleep(8 * 60)
 
 def bot_loop():
-    global total_found, bot_status
+    global total_found, bot_status, first_run
     load_seen_ids()
-    log(f"Bot gestartet um {jetzt()} Uhr – nur Artikel AB JETZT werden gesendet!")
     driver = None
-    browser_started_at = None
+    browser_start = None
+
     while True:
         try:
-            # Browser alle 25 Minuten neustarten
-            if driver is None or (browser_started_at and time.time() - browser_started_at > CONFIG["browser_restart_minutes"] * 60):
+            # Browser alle 20 Min neu starten (RAM-Schutz)
+            if driver is None or (browser_start and time.time() - browser_start > CONFIG["browser_restart_min"] * 60):
                 if driver:
                     try:
                         driver.quit()
-                        log("Browser neugestartet (RAM-Schutz)")
                     except:
                         pass
+                    log("🔄 Browser neugestartet (RAM-Schutz)")
                 driver = start_browser()
                 setup(driver)
-                browser_started_at = time.time()
+                browser_start = time.time()
 
+            neue_items = []
             for brand_config in CONFIG["brands"]:
-                new_items, all_ids = fetch_items(driver, brand_config)
-                # Alle gefundenen IDs als gesehen markieren
-                for iid in all_ids:
-                    seen_ids.add(iid)
-                # Neue Artikel verarbeiten und senden
-                for item in new_items:
-                    item = enrich_item(driver, item)
-                    send_discord(item)
-                    total_found += 1
-                    log(f"🎯 NEU [{item['brand']}] {item['title'][:35]} | {item['total_min']}-{item['total_max']}€ | {item['zustand']}")
-                if new_items:
-                    log(f"[{brand_config['name']}] {len(new_items)} neue Treffer!")
-                time.sleep(2)
+                items = fetch_items(driver, brand_config)
+                for item in items:
+                    seen_ids.add(item["id"])
+                    if not first_run:
+                        neue_items.append(item)
+                if items:
+                    log(f"[{brand_config['name']}] {len(items)} gefunden")
+                time.sleep(1)
+
+            if first_run:
+                first_run = False
+                log(f"✅ Initialisiert: {len(seen_ids)} Artikel markiert – ab jetzt nur NEUE!")
+
+            for item in neue_items:
+                item = enrich_item(driver, item)
+                send_discord(item)
+                total_found += 1
+                log(f"🎯 NEU: {item['title'][:40]} | {item['total_min']}-{item['total_max']}€ | {item['zustand']}")
 
             save_seen_ids()
-            bot_status = f"✅ Läuft seit {jetzt()} | Treffer: {total_found}"
+            bot_status = f"✅ Läuft | Treffer: {total_found} | {jetzt()} Uhr"
             time.sleep(CONFIG["poll_interval"])
 
         except Exception as e:
@@ -479,8 +448,8 @@ def bot_loop():
             except:
                 pass
             driver = None
-            browser_started_at = None
-            log("Neustart in 20 Sekunden...")
+            browser_start = None
+            log("Neustart in 20 Sek...")
             time.sleep(20)
 
 app = Flask(__name__)
@@ -491,15 +460,14 @@ def home():
     return f"""<html><body style="background:#0d1117;color:white;font-family:Arial;padding:20px">
     <h2>🎯 Vinted Snipe Bot</h2>
     <p><b>Status:</b> {bot_status}</p>
-    <p><b>Treffer gesamt:</b> {total_found}</p>
-    <p><b>Gestartet:</b> {datetime.fromtimestamp(BOT_START_TIME, DE).strftime("%H:%M:%S")} Uhr</p>
+    <p><b>Treffer:</b> {total_found}</p>
     <hr style="border-color:#333;margin:15px 0">
-    <p><b>Live Log:</b></p>
+    <p><b>Log:</b></p>
     <p style="font-size:12px;color:#aaa;line-height:2">{logs_html}</p>
     </body></html>"""
 
 threading.Thread(target=bot_loop, daemon=True).start()
-threading.Thread(target=self_ping_loop, daemon=True).start()
+threading.Thread(target=self_ping, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
